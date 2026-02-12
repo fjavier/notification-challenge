@@ -570,7 +570,6 @@ cd lib-notification
 mvn test
 ```
 
-### Paso 7: Testing
 Autor: Francisco Briceño.
 Java Backend Developer
 
