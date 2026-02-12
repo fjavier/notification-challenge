@@ -17,6 +17,7 @@ import com.example.notifications.infraestructure.push.firebase.FirebasePushProvi
 import com.example.notifications.infraestructure.sms.twilio.TwilioConfig;
 import com.example.notifications.infraestructure.sms.twilio.TwilioSmsProvider;
 
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -52,7 +53,8 @@ public class Main {
 
         // ===== 1. Email async con templates =====
         var email = new EmailNotification(
-                "test@mail.com",
+                "senderasync@mail.com",
+                "recipientasync@mail.com",
                 "Hola {{name}}",
                 "Bienvenido {{name}} a {{app}}",
                 Map.of(
@@ -61,12 +63,18 @@ public class Main {
                 )
         );
 
+        var email2 = new EmailNotification(
+                "sendersync@mail.com","recipientsync@mail.com" ,"Hola","SALUDOS",new HashMap<>()
+        );
+        notificationService.send(email2);
+
         notificationService
                 .sendAsync(email)
                 .join();
 
         // ===== 2. SMS sync con template =====
         var sms = new SmsNotification(
+                "+50512345678",
                 "+50588887777",
                 "Hola {{name}}, tu código es {{code}}",
                 Map.of(
