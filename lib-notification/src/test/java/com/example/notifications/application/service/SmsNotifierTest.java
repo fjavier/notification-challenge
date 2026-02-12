@@ -6,6 +6,7 @@ import com.example.notifications.application.port.out.sms.SmsMessage;
 import com.example.notifications.application.port.out.template.TemplateEngine;
 import com.example.notifications.domain.model.SmsNotification;
 import com.example.notifications.domain.result.NotificationResult;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -41,6 +42,7 @@ class SmsNotifierTest {
         Map<String, Object> variables = Map.of("name", "Charlie", "code", "9876");
         SmsNotification notification = new SmsNotification(
                 "+1234567890",
+                "+1234567890",
                 "Hello {{name}}, your code is {{code}}",
                 variables);
 
@@ -65,7 +67,8 @@ class SmsNotifierTest {
         // Arrange
         Map<String, Object> variables = Map.of("user", "Dave");
         SmsNotification notification = new SmsNotification(
-                "+0987654321",
+                "+1987654321",
+                "+1234567890",
                 "Message template",
                 variables);
 
@@ -86,7 +89,7 @@ class SmsNotifierTest {
         // Arrange
         Map<String, Object> variables = Map.of("amount", 100, "currency", "USD");
         SmsNotification notification = new SmsNotification(
-                "+1122334455",
+                "+1122334455","+1234567890",
                 "Your payment of {{amount}} {{currency}} was successful",
                 variables);
 
@@ -108,6 +111,7 @@ class SmsNotifierTest {
         Map<String, Object> variables = Map.of();
         SmsNotification notification = new SmsNotification(
                 "+1234567890",
+                "+1234567890",
                 "Test message",
                 variables);
 
@@ -127,6 +131,7 @@ class SmsNotifierTest {
         Map<String, Object> variables = Map.of();
         SmsNotification notification = new SmsNotification(
                 "+1234567890",
+                "+1234567890",
                 "Test message",
                 variables);
 
@@ -139,5 +144,29 @@ class SmsNotifierTest {
 
         // Assert
         assertTrue(result.isSuccess());
+    }
+
+    @Test
+    void validatePhoneModel() {
+        Assertions.assertThrows(IllegalArgumentException.class, () -> new SmsNotification(
+                "0234567890",
+                "1234567890",
+                "Test message",
+                Map.of()
+        ));
+
+        Assertions.assertThrows(IllegalArgumentException.class, () -> new SmsNotification(
+                "1234567890",
+                "",
+                "Test message",
+                Map.of()
+        ));
+
+        Assertions.assertThrows(IllegalArgumentException.class, () -> new SmsNotification(
+                "1234567890",
+                "1234567890",
+                "",
+                Map.of()
+        ));
     }
 }

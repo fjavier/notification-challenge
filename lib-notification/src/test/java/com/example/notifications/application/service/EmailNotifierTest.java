@@ -6,6 +6,7 @@ import com.example.notifications.application.port.out.email.EmailMessage;
 import com.example.notifications.application.port.out.template.TemplateEngine;
 import com.example.notifications.domain.model.EmailNotification;
 import com.example.notifications.domain.result.NotificationResult;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -40,6 +41,7 @@ class EmailNotifierTest {
         // Arrange
         Map<String, Object> variables = Map.of("name", "John");
         EmailNotification notification = new EmailNotification(
+                "sender@example.com",
                 "recipient@example.com",
                 "Hello {{name}}",
                 "Welcome {{name}}!",
@@ -63,10 +65,39 @@ class EmailNotifierTest {
     }
 
     @Test
+    void shouldThrowErrorValidationWhenSenderIsMissing() {
+        // Arrange
+        Map<String, Object> variables = Map.of("name", "John");
+
+        Assertions.assertThrows(IllegalArgumentException.class,  () -> new EmailNotification(
+                "",
+                "recipient@example.com",
+                "Hello {{name}}",
+                "Welcome {{name}}!",
+                variables));
+
+        Assertions.assertThrows(IllegalArgumentException.class,  () -> new EmailNotification(
+                "sender@",
+                "recipient@example.com",
+                "Hello {{name}}",
+                "Welcome {{name}}!",
+                variables));
+
+        Assertions.assertThrows(IllegalArgumentException.class,  () -> new EmailNotification(
+                "sender@example.com",
+                "@example.com",
+                "Hello {{name}}",
+                "Welcome {{name}}!",
+                variables));
+
+    }
+
+    @Test
     void shouldHandleEmailGatewayError() {
         // Arrange
         Map<String, Object> variables = Map.of("name", "Jane");
         EmailNotification notification = new EmailNotification(
+                "sender@example.com",
                 "recipient@example.com",
                 "Subject",
                 "Body",
@@ -90,6 +121,7 @@ class EmailNotifierTest {
         // Arrange
         Map<String, Object> variables = Map.of("user", "Alice", "code", "12345");
         EmailNotification notification = new EmailNotification(
+                "sender@example.com",
                 "alice@example.com",
                 "Your code: {{code}}",
                 "Hello {{user}}, your verification code is {{code}}",

@@ -19,10 +19,15 @@ public class SmsNotifier implements Notifier<SmsNotification> {
     }
 
     @Override
-    public NotificationResult send(SmsNotification n) {
-        String message = engine.render(n.messageTemplate(), n.variables());
+    public NotificationResult send(SmsNotification notification) {
+        String message = notification.messageTemplate();
+
+        if(notification.variables()!=null && !notification.variables().isEmpty()) {
+            message = engine.render(notification.messageTemplate(), notification.variables());
+        }
+
         SmsMessage smsMessage  = new SmsMessage(
-                "SYSTEM",n.recipient(), message
+                notification.sender(),notification.recipient(), message
         );
         SmsGatewayResponse response = gateway.send(smsMessage);
         if (response!= null && response.error() != null)

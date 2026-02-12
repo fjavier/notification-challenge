@@ -81,7 +81,7 @@ var notificationService = new NotificationService(registry);
 
 ```java
 var email = new EmailNotification(
-    "test@mail.com",
+    "sender@mail.com", "recipient@mail.com",
     "Hola {{name}}",
     "Bienvenido {{name}} a {{app}}",
     Map.of("name", "Javier", "app", "Notifications Lib")
@@ -94,6 +94,7 @@ notificationService.sendAsync(email).join();
 
 ```java
 var sms = new SmsNotification(
+        "+50512345678",
     "+50588887777",
     "Hola {{name}}, tu código es {{code}}",
     Map.of("name", "Javier", "code", "123456")
@@ -139,14 +140,16 @@ Servicio principal para enviar notificaciones.
 
 **Métodos**:
 
-| Método | Descripción | Retorno |
-|--------|-------------|---------|
-| `send(T notification)` | Envío sincrónico | `NotificationResult` |
-| `sendAsync(T notification)` | Envío asincrónico | `CompletableFuture<NotificationResult>` |
+
+| Método                                        | Descripción              | Retorno                                       |
+| ---------------------------------------------- | ------------------------- | --------------------------------------------- |
+| `send(T notification)`                         | Envío sincrónico        | `NotificationResult`                          |
+| `sendAsync(T notification)`                    | Envío asincrónico       | `CompletableFuture<NotificationResult>`       |
 | `sendBatchAsync(List<? extends Notification>)` | Envío batch asincrónico | `CompletableFuture<List<NotificationResult>>` |
-| `shutdown()` | Cierra el ExecutorService | `void` |
+| `shutdown()`                                   | Cierra el ExecutorService | `void`                                        |
 
 **Ejemplo**:
+
 ```java
 // Sincrónico
 var result = notificationService.send(email);
@@ -163,8 +166,10 @@ notificationService.sendBatchAsync(List.of(email1, sms1, push1))
 ### Domain Models
 
 **EmailNotification**:
+
 ```java
 record EmailNotification(
+    String sender,            // Email del que envia
     String recipient,        // Email destinatario
     String subjectTemplate,  // Plantilla asunto: "Hola {{name}}"
     String bodyTemplate,     // Plantilla cuerpo: "Bienvenido {{name}}"
@@ -173,8 +178,10 @@ record EmailNotification(
 ```
 
 **SmsNotification**:
+
 ```java
 record SmsNotification(
+    String sender,            //Número del que envia el mensaje
     String recipient,        // Número: "+50512345678"
     String messageTemplate,  // Plantilla: "Tu código es {{code}}"
     Map<String, Object> variables  // Variables: Map.of("code", "123456")
@@ -182,6 +189,7 @@ record SmsNotification(
 ```
 
 **PushNotification**:
+
 ```java
 record PushNotification(
     String recipient,        // User ID
@@ -194,6 +202,7 @@ record PushNotification(
 ```
 
 **NotificationResult**:
+
 ```java
 record NotificationResult(
     String messageId,  // ID del mensaje enviado
@@ -262,10 +271,10 @@ public class TuProveedorEmailProvider implements EmailGateway {
             message.subject(),
             message.body()
         );
-      
+    
         // 2. Hacer la llamada al API (o simularla)
         TuProveedorResponse response = callApi(request);
-      
+    
         // 3. Traducir la respuesta a EmailGatewayResponse
         if (response.isSuccess()) {
             log.info("Email enviado a: {}, messageId: {}", 
@@ -276,7 +285,7 @@ public class TuProveedorEmailProvider implements EmailGateway {
                 null
             );
         }
-      
+    
         return new EmailGatewayResponse(
             null,
             response.status(),
