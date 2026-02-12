@@ -570,6 +570,10 @@ cd lib-notification
 mvn test
 ```
 
+### Paso 7: Testing
+Autor: Francisco Briceño.
+Java Backend Developer
+
 ---
 
 **Versión**: 1.0.0 | **Java**: 21+ | **Build**: Maven 3.9+
