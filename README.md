@@ -4,9 +4,9 @@ Librería Java para enviar notificaciones multi-canal (Email, SMS, Push) con arq
 
 ## 🎯 Características
 
-- **Multi-canal**: Email, SMS y Push Notifications
+- **Multi-canal**: Email, SMS, Push y Chat Notifications
 - **Arquitectura Hexagonal**: Desacoplamiento total entre capas
-- **Múltiples Proveedores**: SendGrid, Mailgun, Twilio, Firebase
+- **Múltiples Proveedores**: SendGrid, Mailgun, Twilio, Firebase, Slack
 - **Asincronía**: Soporte con `CompletableFuture`
 - **Templating**: Variables dinámicas en mensajes
 - **Type-Safe**: Sealed Interfaces y Records (Java 21)
@@ -61,6 +61,12 @@ var pushNotifier = new PushNotifier(
     new FirebasePushProvider(new FirebaseConfig("project-id", "key")),
     templateEngine
 );
+
+// Chat (Slack)
+var chatNotifier = new ChatNotifier(
+    new SlackProvider(new SlackConfig("webhook-url", null, "workspace", "username", "icon", "iconUrl", "baseUrl")),
+    templateEngine
+);
 ```
 
 ### 2. Registrar y Crear Servicio
@@ -69,7 +75,8 @@ var pushNotifier = new PushNotifier(
 var registry = new NotifierRegistry(Map.of(
     EmailNotification.class, emailNotifier,
     SmsNotification.class, smsNotifier,
-    PushNotification.class, pushNotifier
+    PushNotification.class, pushNotifier,
+    ChatNotification.class, chatNotifier
 ));
 
 var notificationService = new NotificationService(registry);
@@ -116,6 +123,18 @@ var push1 = new PushNotification(
 notificationService.sendBatchAsync(List.of(push1, push2)).join();
 ```
 
+**Chat (Sync)**:
+
+```java
+var chat = new ChatNotification(
+    "#general",  // Canal de Slack
+    "Nuevo mensaje: {{message}}",
+    Map.of("message", "Hola equipo!")
+);
+
+notificationService.send(chat);
+```
+
 ### 4. Cleanup
 
 ```java
@@ -131,6 +150,7 @@ notificationService.shutdown();
 | Email | Mailgun   | `MailgunEmailProvider`  |
 | SMS   | Twilio    | `TwilioSmsProvider`     |
 | Push  | Firebase  | `FirebasePushProvider`  |
+| Chat  | Slack     | `SlackProvider`         |
 
 ## 📚 API Reference
 
@@ -201,6 +221,16 @@ record PushNotification(
 )
 ```
 
+**ChatNotification**:
+
+```java
+record ChatNotification(
+    String recipient,        // Canal/Chat ID: "#general", "C1234567890"
+    String messageTemplate,  // Plantilla: "Nuevo mensaje: {{message}}"
+    Map<String, Object> variables  // Variables: Map.of("message", "Hola!")
+)
+```
+
 **NotificationResult**:
 
 ```java
@@ -215,7 +245,7 @@ record NotificationResult(
 
 ### Paso 1: Identificar el Canal
 
-Determina si tu proveedor es para **Email**, **SMS** o **Push**.
+Determina si tu proveedor es para **Email**, **SMS**, **Push** o **Chat**.
 
 ### Paso 2: Crear el Package
 
@@ -329,6 +359,17 @@ public class TuProveedorPushProvider implements PushGateway {
 }
 ```
 
+**Para Chat**, implementa `ChatGateway`:
+
+```java
+public class TuProveedorChatProvider implements ChatGateway {
+    @Override
+    public ChatGatewayResponse send(ChatMessage message) {
+        // Similar al ejemplo de Email
+    }
+}
+```
+
 ### Paso 5: Crear Request/Response Models
 
 ```java
@@ -399,6 +440,7 @@ void shouldSendEmailViaTuProveedor() {
 | Email | `EmailGateway` | `send(EmailMessage)` | `EmailMessage(from, to, subject, body)`       | `EmailGatewayResponse(messageId, status, errorMessage)` |
 | SMS   | `SmsGateway`   | `send(SmsMessage)`   | `SmsMessage(from, to, message)`               | `SmsGatewayResponse(messageId, status, errorMessage)`   |
 | Push  | `PushGateway`  | `send(PushMessage)`  | `PushMessage(deviceToken, title, body, data)` | `PushGatewayResponse(messageId, status, errorMessage)`  |
+| Chat  | `ChatGateway`  | `send(ChatMessage)`  | `ChatMessage(destination, message)`           | `ChatGatewayResponse(messageId, status, errorMessage)`  |
 
 ## 🔒 Seguridad
 
@@ -429,15 +471,88 @@ var apiKey = props.getProperty("sendgrid.api.key");
 var apiKey = secretsManager.getSecret("sendgrid-api-key");
 ```
 
-## 🏗️ Arquitectura
+## 🏗️ Arquitectura Hexagonal
+
+### ¿Por qué Arquitectura Hexagonal?
+
+La **Arquitectura Hexagonal** (también conocida como **Ports & Adapters**) separa la lógica de negocio del código de infraestructura, permitiendo:
+
+1. **Independencia de Frameworks**: No dependemos de Spring, Jakarta EE, etc.
+2. **Testabilidad**: Podemos testear la lógica sin necesidad de infraestructura real.
+3. **Flexibilidad**: Cambiar de un proveedor a otro (ej: SendGrid a Mailgun) solo requiere cambiar el adaptador.
+4. **Mantenibilidad**: Cada capa tiene responsabilidades claras y bien definidas.
+
+**Concepto clave**: El dominio y la aplicación definen **interfaces (puertos)**, y la infraestructura proporciona **implementaciones (adaptadores)**. Las dependencias apuntan hacia adentro, nunca hacia afuera.
 
 ```
-domain/          → Modelos de negocio (Notification, EmailNotification, etc.)
-application/     → Lógica de aplicación (NotificationService, Notifiers)
-  ├── port/in/   → Interfaces de entrada (Notifier)
-  └── port/out/  → Interfaces de salida (EmailGateway, SmsGateway, PushGateway)
-infrastructure/  → Implementaciones concretas (SendGrid, Twilio, Firebase)
+┌─────────────────────────────────────────────────────┐
+│              INFRASTRUCTURE                         │
+│  (Adaptadores: SendGrid, Twilio, Firebase, Slack)   │
+│              ↓ implementa ↓                         │
+│         ┌──────────────────────┐                    │
+│         │    APPLICATION       │                    │
+│         │  (Puertos: Gateways) │                    │
+│         │      ↓ usa ↓         │                    │
+│         │  ┌──────────────┐    │                    │
+│         │  │   DOMAIN     │    │                    │
+│         │  │  (Modelos)   │    │                    │
+│         │  └──────────────┘    │                    │
+│         └──────────────────────┘                    │
+└─────────────────────────────────────────────────────┘
 ```
+
+### Estructura de Paquetes Completa
+
+```
+lib-notification/src/main/java/com/example/notifications/
+│
+├── 📦 domain/                                    # CAPA DE DOMINIO
+│   │                                             # Contiene la lógica de negocio pura
+│   ├── model/                                    # Modelos de dominio
+│   │   ├── Notification.java                    # Interfaz sellada base
+│   │   ├── EmailNotification.java               # Record para Email
+│   │   ├── SmsNotification.java                 # Record para SMS
+│   │   ├── PushNotification.java                # Record para Push
+│   │   └── ChatNotification.java                # Record para Chat
+│   │
+│   └── result/                                   # Objetos de resultado
+│       └── NotificationResult.java               # Record con resultado del envío (messageId, status, error)
+│
+├── 📦 application/                               # CAPA DE APLICACIÓN
+│   │                                             # Orquesta casos de uso y define puertos
+│   ├── port/                                     # PUERTOS (Interfaces)
+│   │   ├── in/                                   # Puertos de Entrada (Driving)
+│   │   │   └── Notifier.java                    # Interfaz para envio de notificaciones
+│   │   └── out/                                  # Puertos de Salida (Driven)
+│   │       ├── email/ (EmailGateway)
+│   │       ├── sms/ (SmsGateway)
+│   │       ├── push/ (PushGateway)
+│   │       ├── chat/ (ChatGateway)
+│   │       └── template/ (TemplateEngine)
+│   │
+│   ├── service/                                  # SERVICIOS (Lógica de orquestación)
+│   │   ├── NotificationService.java             # Facade principal para el cliente
+│   │   ├── EmailNotifier.java                   # Orquestador de Email
+│   │   ├── SmsNotifier.java                     # Orquestador de SMS
+│   │   ├── PushNotifier.java                    # Orquestador de Push
+│   │   └── ChatNotifier.java                    # Orquestador de Chat
+│   │
+│   └── registry/                                 # REGISTRO
+│       └── NotifierRegistry.java                # Factory para resolver notifiers por tipo
+│
+└── 📦 infrastructure/                            # CAPA DE INFRAESTRUCTURA
+    │                                             # Implementaciones concretas (ADAPTADORES)
+    ├── email/ (SendGrid, Mailgun)
+    ├── sms/ (Twilio)
+    ├── push/ (Firebase)
+    └── chat/ (Slack)                             # Implementación de Slack
+```
+
+### Flujo de Dependencias
+
+1.  **Dominio**: El centro de la aplicación, no depende de nada.
+2.  **Aplicación**: Depende únicamente del dominio. Define lo que la infraestructura debe hacer a través de puertos (`Gateways`).
+3.  **Infraestructura**: Depende de la aplicación para implementar sus puertos. Aquí residen los detalles técnicos (HTTP, APIs externas).
 
 **Principio**: La infraestructura depende de la aplicación, no al revés.
 

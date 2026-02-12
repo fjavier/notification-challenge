@@ -3,7 +3,8 @@ package com.example.notifications.domain.model;
 public sealed interface Notification
         permits EmailNotification,
         SmsNotification,
-        PushNotification {
+        PushNotification,
+        ChatNotification {
 
     String recipient();
 }

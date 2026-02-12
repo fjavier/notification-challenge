@@ -1,15 +1,16 @@
 package org.challenge.demo;
 
+import com.example.notifications.application.port.out.chat.ChatMessage;
 import com.example.notifications.application.port.out.push.PushGateway;
 import com.example.notifications.application.port.out.template.SimpleTemplateEngine;
 import com.example.notifications.application.registry.NotifierRegistry;
-import com.example.notifications.application.service.EmailNotifier;
-import com.example.notifications.application.service.NotificationService;
-import com.example.notifications.application.service.PushNotifier;
-import com.example.notifications.application.service.SmsNotifier;
+import com.example.notifications.application.service.*;
+import com.example.notifications.domain.model.ChatNotification;
 import com.example.notifications.domain.model.EmailNotification;
 import com.example.notifications.domain.model.PushNotification;
 import com.example.notifications.domain.model.SmsNotification;
+import com.example.notifications.infraestructure.chat.slack.SlackConfig;
+import com.example.notifications.infraestructure.chat.slack.SlackProvider;
 import com.example.notifications.infraestructure.email.sendgrid.SendGridConfig;
 import com.example.notifications.infraestructure.email.sendgrid.SendGridEmailProvider;
 import com.example.notifications.infraestructure.push.firebase.FirebaseConfig;
@@ -30,17 +31,13 @@ public class Main {
         // ===== Template Engine =====
         var templateEngine = new SimpleTemplateEngine();
 
-        // ===== Providers =====
-        var emailNotifier = getEmailNotifier(templateEngine);
-        var smsNotifier = getSmsNotifier(templateEngine);
-        var pushNotifier = getPushNotifier(templateEngine);
-
         // ===== Registry (Factory) =====
         var registry = new NotifierRegistry(
                 Map.of(
-                        EmailNotification.class, emailNotifier,
-                        SmsNotification.class, smsNotifier,
-                        PushNotification.class, pushNotifier
+                        EmailNotification.class, getEmailNotifier(templateEngine),
+                        SmsNotification.class, getSmsNotifier(templateEngine),
+                        PushNotification.class, getPushNotifier(templateEngine),
+                        ChatNotification.class, getChatNotifier(templateEngine)
                 )
         );
 
@@ -109,6 +106,21 @@ public class Main {
                 .join();
 
         notificationService.shutdown();
+
+        ChatNotification chat = new ChatNotification(
+                "Usuario de slack", "Mensaje de bienvenida", null
+        );
+
+        notificationService.send(chat);
+    }
+
+    private static ChatNotifier getChatNotifier(SimpleTemplateEngine templateEngine) {
+        var chatProvider = new SlackProvider(
+            new SlackConfig(
+                    "https://webhook.slack/", null, "workspace", "username", "icon", "iconUrl", "baseUrl"
+            )
+        );
+        return new ChatNotifier(chatProvider, templateEngine);
     }
 
     private static PushNotifier getPushNotifier(SimpleTemplateEngine templateEngine) {
